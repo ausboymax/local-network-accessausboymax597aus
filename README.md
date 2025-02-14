@@ -70,7 +70,7 @@ We define a **local network request** as a request crossing an address space bou
 
 1. `public` -> `local`
 2. `public` -> `loopback`
-3. `local` -> `localback`
+3. `local` -> `loopback`
 
 Note that `local` -> `local` is not a local network request, as well as `loopback` -> anything. (See "cross-origin requests" below for a discussion on potentially expanding this definition in the future.)
 
