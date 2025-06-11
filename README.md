@@ -2,6 +2,8 @@
 
 This proposal is an early design sketch by the Chrome Secure Web and Network team to describe the problem below and solicit feedback on the proposed solution. It has not been approved to ship in Chrome.
 
+**Interested in testing Local Network Access in Chrome?** We have a blog post up with details for interested developers who want to test https://developer.chrome.com/blog/local-network-access
+
 ## Proponents
 
 *   Chrome Secure Web and Network team
