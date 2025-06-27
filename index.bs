@@ -34,6 +34,14 @@ Include Can I Use Panels: yes
     "href": "https://331.cybersec.fun/TeamCymruSOHOPharming.pdf",
     "title": "SOHO Pharming",
     "authors": [ "Team Cymru" ]
+  },
+  "AVASTIUM": {
+    "href": "https://bugs.chromium.org/p/project-zero/issues/detail?id=679",
+    "title": "Avast: A web-accessible RPC endpoint can launch 'SafeZone' (also called Avastium), a Chromium fork with critical security checks removed."
+  },
+  "TREND-MICRO": {
+    "href": "https://bugs.chromium.org/p/project-zero/issues/detail?id=693",
+    "title": "TrendMicro node.js HTTP server listening on localhost can execute commands"
   }
 }
 </pre>
@@ -58,3 +66,72 @@ network.
 *Note:* This proposal builds on top of Chrome's previously paused
 [[PRIVATE-NETWORK-ACCESS]] work but differs by gating access on a permission
 rather than via preflight requests.
+
+## Goals {#goals}
+
+The overarching goal is to prevent the user agent from inadvertently enabling
+attacks on devices running on a user’s local intranet, or services running on
+the user’s machine directly. For example, we wish to mitigate attacks on:
+
+* Users' routers, as outlined in [[SOHO-PHARMING]]. Note that status quo CORS
+    protections don’t protect against the kinds of attacks discussed here as they
+    rely only on [=CORS-safelisted methods=] and [=CORS-safelisted
+    request-headers=].  No CORS preflight is triggered, and the attacker doesn’t
+    care about reading the response, as the request itself is the CSRF attack.
+
+* Software running a web interface on a user’s loopback address. For better or
+    worse, this is becoming a common deployment mechanism for all manner of
+    applications, and often assumes protections that simply don’t exist (see
+    [[AVASTIUM]] and [[TREND-MICRO]] for recent examples).
+
+There should be a well-lit path to allow these requests when the user is both
+expecting and explicitly allowing the local network access requests to occur.
+For example, a user logged in to [plex.tv](https://plex.tv) may want to allow
+the site to connect to their local media server to directly load media content
+over the local network instead of routing through remote servers. See S1.2
+below for more examples.
+
+## Non-goals {#non-goals}
+
+This spec does not attempt to make it easier to use HTTPS connections on local
+network devices. While this would be a useful goal, solving this problem is out
+of scope for this specification
+
+## Examples {#examples}
+
+### User granting permission {#example-user-granting-permission}
+
+Alice is at home on her laptop browsing the internet. She has a printer on her
+local network built by Acme Printing Company that is running a simple HTTP
+server. Alice is having a problem with the printer not properly functioning.
+
+Alice goes to Acme Printing Company's web site to help diagnose the problem.
+Acme Printing Company's web site tells Alice that it can connect to the printer
+to look at the diagnostic output of the printer. Alice's browser asks Alice to
+allow https://support.acmeprintingcompany.com to connect to local devices on
+her network. Alice grants permission for
+https://support.acmeprintingcompany.com to connect to local devices on her
+network, and https://support.acmeprintingcompany.com connects to her local
+printer's diagnostic output, and tells Alice that a part is malfunctioning on
+the printer and needs to be replaced.
+
+### User denying permission {#example-user-denying-permission}
+
+Alice continues browsing online to find the best price for the replacement part
+on her printer. While looking at a general tech support forum, she suddenly
+gets a permission request in her browser for https://printersupport.evil.com to
+connect to local devices on her local network. Being suspicious of why
+https://printersupport.evil.com would need to connect to local devices, she
+denies the permission request.
+
+
+### New device configuration {#example-new-device-configuration}
+
+Instead of replacing the part on the printer, Alice decides instead to buy a
+new printer from Beta Manufacturing. Upon plugging in the printer and
+connecting it to her local network, Alice follows the instructions and goes to
+https://setup.betaprinters.com on her laptop. Upon opening the site, she sees a
+button that will help her set up the printer defaults. Hitting the button, she
+gets a permission prompt asking for permission for
+https://setup.betaprinters.com to connect to her local devices, which she
+accepts.
