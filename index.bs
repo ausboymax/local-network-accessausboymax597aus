@@ -42,11 +42,20 @@ Include Can I Use Panels: yes
   "TREND-MICRO": {
     "href": "https://bugs.chromium.org/p/project-zero/issues/detail?id=693",
     "title": "TrendMicro node.js HTTP server listening on localhost can execute commands"
+  },
+  "IPV4-REGISTRY": {
+    "href": "https://www.iana.org/assignments/iana-ipv4-special-registry/iana-ipv4-special-registry.xhtml",
+    "title": "IANA IPv4 Special-Purpose Address Registry"
+  },
+  "IPV6-REGISTRY": {
+    "href": "https://www.iana.org/assignments/iana-ipv6-special-registry/iana-ipv6-special-registry.xhtml",
+    "title": "IANA IPv6 Special-Purpose Address Registry"
   }
+
 }
 </pre>
 
-# Introduction {#intro}
+# Introduction # {#intro}
 
 *This section is not normative.*
 
@@ -63,11 +72,11 @@ local IP addresses from public websites, and instead requiring that the user
 grants permission to the initiating website to make connections to their local
 network.
 
-*Note:* This proposal builds on top of Chrome's previously paused
+Note: This proposal builds on top of Chrome's previously paused
 [[PRIVATE-NETWORK-ACCESS]] work but differs by gating access on a permission
 rather than via preflight requests.
 
-## Goals {#goals}
+## Goals ## {#goals}
 
 The overarching goal is to prevent the user agent from inadvertently enabling
 attacks on devices running on a user’s local intranet, or services running on
@@ -91,15 +100,15 @@ the site to connect to their local media server to directly load media content
 over the local network instead of routing through remote servers. See S1.2
 below for more examples.
 
-## Non-goals {#non-goals}
+## Non-goals ## {#non-goals}
 
 This spec does not attempt to make it easier to use HTTPS connections on local
 network devices. While this would be a useful goal, solving this problem is out
 of scope for this specification
 
-## Examples {#examples}
+## Examples ## {#examples}
 
-### User granting permission {#example-user-granting-permission}
+### User granting permission ### {#example-user-granting-permission}
 
 Alice is at home on her laptop browsing the internet. She has a printer on her
 local network built by Acme Printing Company that is running a simple HTTP
@@ -115,7 +124,7 @@ network, and https://support.acmeprintingcompany.com connects to her local
 printer's diagnostic output, and tells Alice that a part is malfunctioning on
 the printer and needs to be replaced.
 
-### User denying permission {#example-user-denying-permission}
+### User denying permission ### {#example-user-denying-permission}
 
 Alice continues browsing online to find the best price for the replacement part
 on her printer. While looking at a general tech support forum, she suddenly
@@ -124,8 +133,7 @@ connect to local devices on her local network. Being suspicious of why
 https://printersupport.evil.com would need to connect to local devices, she
 denies the permission request.
 
-
-### New device configuration {#example-new-device-configuration}
+### New device configuration ### {#example-new-device-configuration}
 
 Instead of replacing the part on the printer, Alice decides instead to buy a
 new printer from Beta Manufacturing. Upon plugging in the printer and
@@ -135,3 +143,279 @@ button that will help her set up the printer defaults. Hitting the button, she
 gets a permission prompt asking for permission for
 https://setup.betaprinters.com to connect to her local devices, which she
 accepts.
+
+# Framework # {#framework}
+
+## IP Address Space ## {#ip-address-space-section}
+
+Define {{IPAddressSpace}} as follows:
+
+<pre class=idl>
+enum IPAddressSpace { "public", "local" };
+</pre>
+
+Every IP address belongs to an <dfn export local-lt="address space">IP address
+space</dfn>, which can be one of two different values:
+
+  1. <dfn for="IP address space" export>local</dfn>: contains addresses that have
+    meaning only within the current network. In other words, addresses whose target
+    differs based on network position. This includes loopback addresses, which are
+    only accessible on the local host (and thus differ for every device).
+
+  1. <dfn for="IP address space" export>public</dfn>: contains all other
+    addresses. In other words, addresses whose target is the same for all devices
+    globally on the IP network.
+
+For convenience, we additionally define the following terms:
+
+  1. A <dfn>local address</dfn> is an IP address whose [=/IP address space=] is
+    [=IP address space/local=].
+  1. A <dfn>public address</dfn> is an IP address whose [=/IP address space=]
+    is [=IP address space/public=].
+
+An [=/IP address space=] |lhs| is
+<dfn for="IP address space" export>less public</dfn> than an
+[=/IP address space=] |rhs| if any of the following conditions holds true:
+
+  1. |lhs| is [=IP address space/local=] and |rhs| is
+    [=IP address space/public=].
+
+To <dfn export>determine the IP address space</dfn> of an IP address
+  |address|, run the following steps:
+
+  1.  If |address| belongs to the `::ffff:0:0/96` "IPv4-mapped Address"
+      address block, then replace |address| with its embedded IPv4 address.
+  1.  For each |row| in the
+      <a href="#non-public-ip-address-blocks">Non-public IP address blocks"</a>
+      table:
+      1.   If |address| belongs to |row|'s address block, return |row|'s
+           address space.
+  1.  Return [=IP address space/public=].
+
+  <table id="non-public-ip-address-blocks">
+    <caption>Non-public IP address blocks</caption>
+    <thead>
+      <tr>
+        <th>Address block</th>
+        <th>Name</th>
+        <th>Reference</th>
+        <th>Address space</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>`127.0.0.0/8`</td>
+        <td>IPv4 Loopback</td>
+        <td>[[RFC1122]]</td>
+        <td>[=IP address space/local=]</td>
+      </tr>
+      <tr>
+        <td>`10.0.0.0/8`</td>
+        <td>Private Use</td>
+        <td>[[RFC1918]]</td>
+        <td>[=IP address space/local=]</td>
+      </tr>
+      <tr>
+        <td>`100.64.0.0/10`</td>
+        <td>Carrier-Grade NAT</td>
+        <td>[[RFC6598]]</td>
+        <td>[=IP address space/local=]</td>
+      </tr>
+      <tr>
+        <td>`172.16.0.0/12`</td>
+        <td>Private Use</td>
+        <td>[[RFC1918]]</td>
+        <td>[=IP address space/local=]</td>
+      </tr>
+      <tr>
+        <td>`192.168.0.0/16`</td>
+        <td>Private Use</td>
+        <td>[[RFC1918]]</td>
+        <td>[=IP address space/local=]</td>
+      </tr>
+      <tr>
+        <td>`198.18.0.0/15`</td>
+        <td>Benchmarking</td>
+        <td>[[RFC2544]]</td>
+        <td>[=IP address space/local=]</td>
+      </tr>
+      <tr>
+        <td>`169.254.0.0/16`</td>
+        <td>Link Local</td>
+        <td>[[RFC3927]]</td>
+        <td>[=IP address space/private=]</td>
+      </tr>
+      <tr>
+        <td>`::1/128`</td>
+        <td>IPv6 Loopback</td>
+        <td>[[RFC4291]]</td>
+        <td>[=IP address space/local=]</td>
+      </tr>
+      <tr>
+        <td>`fc00::/7`</td>
+        <td>Unique Local</td>
+        <td>[[RFC4193]]</td>
+        <td>[=IP address space/local=]</td>
+      </tr>
+      <tr>
+        <td>`fe80::/10`</td>
+        <td>Link-Local Unicast</td>
+        <td>[[RFC4291]]</td>
+        <td>[=IP address space/local=]</td>
+      </tr>
+      <tr>
+        <td>`::ffff:0:0/96`</td>
+        <td>IPv4-mapped</td>
+        <td>[[RFC4291]]</td>
+        <td>see mapped IPv4 address</td>
+      </tr>
+    </tbody>
+  </table>
+
+User Agents MAY allow certain IP address blocks' [=address space=] to be
+overridden through administrator or user configuration. This could prove
+useful to protect e.g. IPv6 intranets where most IP addresses are considered
+[=IP address space/public=] per the algorithm above, by instead configuring
+user agents to treat the intranet as [=IP address space/local=].
+
+Note: Link-local IP addresses such as `169.254.0.0/16` are considered
+[=IP address space/local=], since such addresses can identify the same
+target for all devices on a network link. A previous version of this
+specification considered them to be [=IP address space/local=] instead.
+
+Note: The contents of each [=/IP address space=] were at one point determined
+in accordance with the IANA Special-Purpose Address Registries
+([[IPV4-REGISTRY]] and [[IPV6-REGISTRY]]) and the `Globally Reachable` bit
+defined therein. This turned out to be an inaccurate signal for our uses, as
+described in
+PNA's spec issue #50](https://github.com/WICG/private-network-access/issues/50).
+
+Note: [[PRIVATE-NETWORK-ACCESS]] used the address spaces public, private, and
+local. This specification simplifies the address spaces by combining
+[[PRIVATE-NETWORK-ACCESS]]'s private and local together into [=IP address
+space/local=].
+
+
+## Local Network Request ## {#local-network-request-section}
+
+A [=request=] (|request|) is a <dfn export>local network request</dfn>
+if |request|'s [=request/current url=]'s {{URL/host}} maps to an IP address
+whose [=/IP address space=] is [=IP address space/less public=] than
+|request|'s [=request/policy container=]'s
+[=policy container/IP address space=].
+
+The classification of IP addresses into two broad [=address spaces=] is an
+imperfect and theoretically-unsound approach. It is a proxy used to determine
+whether two network endpoints should be allowed to communicate freely or not,
+in other words whether endpoint A is reachable from endpoint B without
+pivoting through the user agent on endpoint C.
+
+This approach has some flaws:
+
+  * false positives: an intranet server with a [=public address=] might not be
+    able to directy issue requests to another server on the same intranet with
+    a [=local address=].
+  * false negatives: a client connected to two different
+    [=IP address space/local=] networks, say a home network and a VPN, might
+    allow a website served from the VPN to access devices on the home network.
+    See also the issue below.
+
+Even so, this specification aims to offer a pragmatic solution to a security
+issue that broadly affects most users of the Web whose network configurations
+are not so complex.
+
+ISSUE: The definition of [=local network requests=] could be expanded to
+cover all cross-origin requests for which the [=request/current url=]'s
+{{URL/host}} maps to an IP address whose [=/IP address space=] is not
+[=IP address space/public=]. This would prevent a malicious server on the
+local network from attacking other servers, including servers on `localhost`.
+Currently, Chromium only implements Local Network Access restrictions for
+[=IP address space/public=] to [=IP address space/local=] requests, and does
+not enforce the permission for cross-origin [=IP address space/local=]
+requests. This can be shipped as an incremental improvement later on. [PNA
+Issue #39](https://github.com/wicg/private-network-access/issues/39) We note
+that, because local names and addresses are not meaningful outside the bounds
+of the network, implementers may want to use a different permission prompt for
+the cross-origin [=IP address space/local=] case than for the [=IP address
+space/public=] to [=IP address space/local=] case, and may want to scope these
+permission grants to the specific network or to the current browsing session
+only.
+
+NOTE: Requests originating from the loopback address should not be considered
+[=local network requests=], and should not be subject to local network access
+checks, since any software running on the user’s device is already in the most
+privileged vantage point on the user’s network.
+
+NOTE: Some [=local network requests=] are more challenging to secure than others.
+See § 4.4 Rollout difficulties for more details.
+
+## Local Network Request Permission Prompt ## {#permission-prompt}
+
+A local network access permission prompt is introduced to allow for users to
+approve of [=local network requests=] from public websites to local network servers.
+
+When a [=local network request=] is detected, a prompt is shown to the user asking
+for permission to access the local network. If the user decides to grant the
+permission, then the fetch continues. If not, it fails.
+
+The exact scope of the permission is implementation-defined. The permission may
+be as coarse-grained as allowing a specific origin to send [=local network
+requests=] to any endpoint on the local network, or may be more fine-grained to
+only allow specific origins to communicate with specific endpoints on the local
+network. A user agent may persist this decision to reduce permission fatigue.
+
+## Secure Context Restriction ## {#secure-context-restriction}
+
+The capability to make local network requests is a [=powerful feature=]
+and must only be allowed from [=secure contexts=].
+
+ISSUE: To be able to apply LNA checks to all cross-origin [=IP address
+space/local=] requests (see Issue above), Chromium plans to exempt local
+servers that likely cannot currently get publicly trusted HTTPS certificates
+from this requirement (e.g., servers on `.local` and private IP literals). See
+Section 4.4 (Rollout Difficulties) below for more discussion, and also see
+[https://github.com/WICG/private-network-access/issues/96](https://github.com/WICG/private-network-access/issues/96).
+
+## Mixed Content ## {#mixed-content-lna}
+
+Many local network servers do not run HTTPS, as it has proven difficult (and
+sometimes even impossible) to migrate local network servers away from HTTP.
+This is problematic as the [=secure context=] restriction, combined with mixed
+content checks, would block many [=local network requests=] even if the user would
+give permission for the request to occur.
+
+One solution to this problem is to bypass mixed content checks in situations
+where the request is known to be a [=local network request=]. This is known in a
+few situations:
+
+  * When the hostname of the request target is an IP literal identified as [=IP
+    address space/local=] in the <a
+    href="#non-public-ip-address-blocks">Non-public IP address blocks"
+    table</a> (e.g., an [[RFC1918]] IP literal)
+  * When the hostname of the request is a .local domain (RFC 6762)
+
+There may be situations in which neither of the above situations is true, and
+yet the site wants to identify a request as being a [=local network request=]. This
+can be mitigated by adding a new parameter to the `fetch()` options bag:
+
+<pre highlight="js">
+fetch("http://router.local/ping", {
+  targetAddressSpace: "local",
+});
+</pre>
+
+This instructs the browser to allow the fetch to bypass mixed-content checks
+even though the scheme is non-secure and potentially obtain a connection to the
+target server. The new `fetch()` API is backward-compatible.
+
+Note that this feature cannot be abused to bypass mixed content in general. If
+the resolved remote IP address does not belong to the IP address space
+specified as the targetAddressSpace option value, then the request will fail.
+If it does belong, then the permission can be checked to allow or fail the
+request.
+
+TODO: Decide if we want to keep the CSP directive `treat-as-public-address`
+around, see
+[https://wicg.github.io/private-network-access/#csp](https://wicg.github.io/private-network-access/#csp).
+This directive would be obviated if we implemented
+[https://github.com/wicg/private-network-access/issues/39](https://github.com/wicg/private-network-access/issues/39).\]
