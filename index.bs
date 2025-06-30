@@ -679,7 +679,7 @@ The Fetch API needs to be adjusted as well.
         };
       </pre>
 
-  * Define a new [=targetAddressSpace=] representing the
+  * Define a new targetAddressSpace representing the
     above in [=request=].
       <pre class="idl">
         partial interface Request {
@@ -699,7 +699,7 @@ The Fetch API needs to be adjusted as well.
             <dd>Do nothing.
 
           <dt>local
-          <dd>Set |request|'s [=target IP address space=] to [=IP address
+          <dd>Set |request|'s targetAddressSpace to [=IP address
             space/local=].
         </dl>
 
