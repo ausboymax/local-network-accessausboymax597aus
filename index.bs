@@ -388,7 +388,7 @@ checks, since any software running on the user’s device is already in the most
 privileged vantage point on the user’s network.
 
 NOTE: Some [=local network requests=] are more challenging to secure than others.
-See <a href="#rollout-difficulties"> Rollout Difficulties</a> for more details.
+See [[#rollout-difficulties]] for more details.
 
 ## Local Network Request Permission Prompt ## {#permission-prompt}
 
@@ -414,8 +414,7 @@ ISSUE: To be able to apply LNA checks to all cross-origin [=IP address
 space/local=] requests (see Issue above), Chromium plans to exempt local
 servers that likely cannot currently get publicly trusted HTTPS certificates
 from this requirement (e.g., servers on `.local` and private IP literals). See
-<a href="#rollout-difficulties"> Rollout Difficulties</a> for more discussion,
-and also see
+[[#rollout-difficulties]] for more discussion, and also see
 [https://github.com/WICG/private-network-access/issues/96](https://github.com/WICG/private-network-access/issues/96).
 
 ## Mixed Content ## {#mixed-content-lna}
@@ -463,6 +462,368 @@ This directive would be obviated if we implemented
 [https://github.com/wicg/private-network-access/issues/39](https://github.com/wicg/private-network-access/issues/39).\]
 
 # Integrations # {#integrations}
+
+*This section is non-normative.*
+
+This document proposes a number of modifications to other specifications in
+order to implement the mitigations sketched out in the examples above. These
+integrations are outlined here for clarity, but the external documents are the
+normative references.
+
+## Integration with Permissions ## {#integration-with-permissions}
+
+This document defines a [=powerful feature=] identified by the [=powerful
+feature/name=] <dfn export permission>`"local-network-access"`</dfn>.  It
+overrides the following type:
+
+<dl>
+  <dt>[=powerful feature/permission descriptor type=]</dt>
+  <dd>
+    The [=powerful feature/permission descriptor type=] of the
+    <a permission>`"local-network-access"`</a> feature is defined by the
+    following WebIDL interface that [=dictionary/inherits=] from the
+    default [=powerful feature/permission descriptor type=]:
+    <pre class="idl">
+      dictionary LocalNetworkAccessPermissionDescriptor
+          : PermissionDescriptor {
+        DOMString id;
+      };
+    </pre>
+  </dd>
+</dl>
+
+## Integration with Fetch ## {#integration-with-fetch}
+
+This document proposes a few changes to Fetch, with the following implication:
+[=local network requests=] are only allowed if their
+[=request/client=] is a [=secure context=]
+**and** permission is granted by the user. If the request would have been
+blocked as mixed content, it can be allowed as long as the website states its
+intention to access the private network, and users give permission.
+
+Note: This includes navigations. These can indeed be used to trigger CSRF
+attacks, albeit with less subtlety than with subresource requests.
+
+ISSUE: Chromium only applies LNA restrictions to iframe navigations currently.
+It may be worth expanding this to include main-frame navigations (especially
+popup windows which can be controlled by their opener).
+
+Note: [[FETCH]] does not yet integrate the
+details of DNS resolution into the
+[=/Fetch=] algorithm, though it does
+define an [=obtain a connection=] algorithm
+which is enough for this specification. Local Network Access checks are applied
+to the newly-obtained connection. Given complexities such as Happy Eyeballs
+([[RFC6555 obsolete]], [[RFC8305]]), these checks might pass or fail
+non-deterministically for hosts with multiple IP addresses that straddle IP
+address space boundaries.
+
+### Fetching ### {#fetching}
+
+What follows is a sketch of a potential solution:
+
+  1.  [=Connection=] objects are given a new <dfn export for="connection">IP
+      address space</dfn> property, initially null. This applies to WebSocket
+      connections too.
+
+  1.  A new step is added to the [=obtain a connection=] algorithm immediately
+      before appending |connection| to the user agent's [=connection pool=]:
+
+      1.  Set |connection|'s [=connection/IP address space=] to
+          the result of running the [=determine the IP address space=] algorithm
+          on the IP address of |connection|'s remote endpoint.
+
+          ISSUE: The remote endpoint concept is not specified in [[FETCH]]
+          yet, hence this is still handwaving to some extent.
+
+  1.  [=Request=] objects are given a new <dfn for="request" export>target IP
+      address space</dfn> property, initially null.
+
+  1.  [=Response=] objects are given a new
+      <dfn export for="response">IP address space</dfn> property, whose value is
+      an [=/IP address space=], initially null.
+
+  1.  Define a new <dfn export>Local Network Access check</dfn> algorithm.
+      Given a [=request=] |request| and a [=connection=] |connection|:
+
+      1.  If |request|'s [=request/origin=] is a [=potentially trustworthy
+          origin=] and |request|’s [=request/current URL=]’s [=request/origin=]
+          is [=same origin=] with |request|’s [=request/origin=], then return
+          null.
+
+      1.  If |request|'s [=request/policy container=] is null, then return null.
+
+          NOTE: If |request|'s [=request/policy container=] is null, then LNA
+          checks do not apply to |request|. Users of the [=fetch=] algorithm
+          should take care to either set |request|'s [=request/client=] to an
+          [=environment settings object=] with a non-null [=environment settings
+          object/policy container=] and let [=fetch=] initialize |request|'s
+          [=request/policy container=] accordingly, or to directly set
+          |request|'s [=request/policy container=] to a non-null value.
+
+      1.  If |request|'s [=request/target IP address space=] is not null, then:
+
+          1.  [=Assert=]: |request|'s [=request/target IP address space=] is not
+              [=IP address space/public=].
+
+          1.  If |connection|'s [=connection/IP address space=] is not equal to
+              then |request|'s [=request/target IP address space=], then return
+              a [=network error=].
+
+          1.  Return null.
+
+      1.  If |connection|'s [=connection/IP address space=] is
+          [=IP address space/less public=] than |request|'s [=request/policy
+          container=]'s [=policy container/IP address space=], then:
+
+              1.  Let |error| be a [=network error=].
+
+              1.  If |request|'s [=request/client=] is not a [=secure context=]
+                  (including if it is null), then return |error|.
+
+              1.  Set |error|'s [=response/IP address space=] property to
+                  |connection|'s [=connection/IP address space=].
+
+              4.  TODO: Permission check is sketched out below, wording is still vague
+                  1. If the initiating origin has been granted the local
+                     network access permission, return null.
+                  2. If the initiating origin has been denied the local network
+                     access permission, return |error|.
+                  3. Otherwise, prompt the user:
+                     1. If the user grants permission, return null.
+                     2. If the user denies the permission, return |error|.
+      1.  Return null.
+
+  1.  The [$fetch$] algorithm is amended to add 2 new steps right after request’s
+      policy container is set:
+
+      1.  If |request|’s target IP address space is null:
+
+          1. If |request|’s URL’s host *host* is an IP address and the result
+             of running the determine the IP address space algorithm on *host* is
+             “local”, then set *request*’s target IP address space property to
+             “local”.
+          2. If |request|’s URL’s host’s public suffix is `"local"`, then set
+             |request|’s target IP address space property to `"local"`.
+
+             NOTE: We could also set the target IP address space to `local` if
+             the request’s URL’s host is “localhost” or “127.0.0.1” (because of
+             \[let-localhost-be-localhost\]), but we do not need special
+             handling for the loopback case as it is already considered to be
+             potentially trustworthy and won’t trigger mixed content checks.
+
+             NOTE: We also explicitly do *not* set the target address space
+             property in the public case, because that breaks the next step
+             here... (but maybe we could just skip that??)
+
+             NOTE: We don’t set the target IP address space here if it was
+             already non-null in order to prefer the explicit
+             targetAddressSpace if set by the fetch() API.
+
+      2.  If |request|’s target IP address space is public, then return a network error.
+
+          OPEN QUESTION: Do we need this? Under what conditions can this get set to "public"?
+
+  1.  The [$HTTP-network fetch$] algorithm is amended to add 3 new steps right
+      after checking that the newly-obtained <var ignore>connection</var> is not
+      failure:
+
+          1.  Set |response|'s [=response/IP address space=] to
+              |connection|'s [=connection/IP address space=].
+
+          1.  Let |localNetworkAccessCheckResult| be the result of running
+              [=Local Network Access check=] for |fetchParams|' [=request=]  and
+              |connection|.
+
+          1.  If |localNetworkAccessCheckResult| is a [=network error=], return
+              |localNetworkAccessCheckResult|.
+
+  1.  Define a new algorithm called <dfn>HTTP-no-service-worker fetch</dfn>
+      based on the existing steps in [=HTTP fetch=] that are run if |response|
+      is still null after handling the fetch via service workers, and amend
+      those slightly as follows:
+
+      1.  Immediately after running HTTP-network-or-cache fetch:
+          1.  If |response| is a [=network error=] and |response|'s
+              [=response/IP address space=] is non-null, then:
+
+              1.  Set |request|'s [=request/target IP address space=] to
+                  |response|'s [=response/IP address space=].
+
+              1.  Return the result of running [=HTTP-no-service-worker fetch=]
+                  given |fetchParams|.
+
+          NOTE: Because request’s target IP address space is set to a non-null
+          value when recursing, this recursion can go at most 1 level deep.
+
+TODO: Figure out what we need to add for cache fetch. A sketch of Chromium’s
+behavior is included below in [[#http-cache]].
+
+NOTE: The requirement that local network requests be made from secure contexts
+means that any insecure request will be blocked as mixed content unless we can
+know ahead of time that the request should be considered a local network
+request. By setting the target IP address space property (see Step 6i and 6ii
+above), we only need to make a small change to Mixed Content -- see
+[[#integration-with-mixed-content]].
+
+### Fetch API ### {#fetch-api}
+
+The Fetch API needs to be adjusted as well.
+
+  * Append an optional [=map/entry=] to {{RequestInfo}}, whose [=map/key=] is
+    <dfn export>targetAddressSpace</dfn>, and [=map/value=] is a
+    {{IPAddressSpace}}.
+      <pre class="idl">
+        partial dictionary RequestInit {
+          IPAddressSpace targetAddressSpace;
+        };
+      </pre>
+
+  * Define a new targetAddressSpace representing the
+    above in [=request=].
+      <pre class="idl">
+        partial interface Request {
+          readonly attribute IPAddressSpace targetAddressSpace;
+        };
+      </pre>
+
+  * The <a constructor for=Request lt="Request(input, init)"><code>new
+    Request(<var ignore=''>input</var>, |init|)</code></a> is
+    appended with the following step right before setting [=this=]'s [=request=]
+    to |request|:
+
+    1.  If |init|["{{RequestInit/targetAddressSpace}}"] [=map/exists=], then
+        switch on |init|["{{RequestInit/targetAddressSpace}}"]:
+        <dl class=switch>
+          <dt>public
+            <dd>Do nothing.
+
+          <dt>local
+          <dd>Set |request|'s targetAddressSpace to [=IP address
+            space/local=].
+        </dl>
+
+## Integration with Mixed Content ## {#integration-with-mixed-content}
+
+The [=Should fetching request be blocked as mixed content?=] is amended to add
+the following condition to one of the **allowed** conditions:
+
+  1. |request|'s [=request/origin=] is not a [=potentially trustworthy origin=],
+     and |request|'s [=request/target IP address space=] is [=IP address space/local=].
+
+The "[Upgrade request to an a priori authenticated URL as mixed content, if
+appropriate](https://w3c.github.io/webappsec-mixed-content/level2.html#upgrade-algorithm)"
+algorithm is amended to add the following condition as an exception from
+upgrading in step 1:
+
+  6. |request|’s target IP address space is [=IP address space/local=]
+
+## Integration with WebSockets ## {#integration-with-websockets}
+
+WebSockets connections should be subject to the same local network access
+permission requirements.
+
+[TODO: WebSockets “Obtain a WebSocket connection” is distinct, and a
+“WebSocket connection” is also distinct. So strictly by spec we need to
+duplicate some of our Fetch details but for WebSockets. See
+[https://websockets.spec.whatwg.org/\#concept-websocket-connection-obtain](https://websockets.spec.whatwg.org/#concept-websocket-connection-obtain)\]
+
+## Integration with WebTransport ## {#integration-with-webtransport}
+
+WebTransport connections should be subject to the same local network access
+permission requirements.
+
+## Integration with HTML ## {#integration-with-html}
+
+To support the checks in [[FETCH]], user
+agents must remember the source IP address space of contexts in which network
+requests are made. To this effect, the
+[[HTML]] specification is patched as
+follows:
+
+  1. A new <dfn export for="policy container">IP address space </dfn> property
+     is added to the [=/policy container=] [=struct=].
+
+     1. It is initially public.
+
+  2. An additional step is added to the [=clone a policy container=] algorithm:
+
+     1. Set <var ignore>clone</var>'s [=policy container/IP address space=] to
+        <var ignore>policyContainer</var>'s [=policy container/IP address space=].
+
+  3. An additional step is added to the [=create a policy container from a fetch response=]
+     algorithm:
+
+     1. Set <var ignore>result</var>'s [=policy container/IP address space=]
+        to <var ignore>response</var>'s [=response/IP address space=].
+
+
+<div class="example">
+Assuming that `example.com` resolves to a [=public address=] (say,
+`123.123.123.123`), then the {{Document}} created when navigating to
+`https://example.com/document.html` will have its
+[=Document/policy container=]'s [=policy container/IP address space=]
+property set to [=IP address space/public=].
+
+If this {{Document}} then embeds an `about:srcdoc` iframe, then the child
+frame's {{Document}} will have its [=Document/policy container=]'s
+[=policy container/IP address space=] property set to
+[=IP address space/public=].
+
+If, on the other hand, `example.com` resolved to a [=local address=]
+(say, `127.0.0.1`), then the {{Document}} created when navigating to
+`https://example.com/document.html` will have its
+[=Document/policy container=]'s [=policy container/IP address space=]
+property set to [=IP address space/local=].
+</div>
+
+TODO: Also update the reference to Private Network Access in
+https://html.spec.whatwg.org/multipage/browsers.html#coep
+
+## Integration with Workers ## {#integration-with-workers}
+
+*This section is non-normative.*
+
+Given that {{WorkerGlobalScope}} already has a
+[=WorkerGlobalScope/policy container=] field populated using the [=create a
+policy container from a fetch response=] algorithm, the avove integrations
+with Fetch and HTML apply just as well to worker contexts as to documents.
+
+  <div class="example">
+    Assuming that `example.com` resolves to a [=public address=] (say,
+    `123.123.123.123`), then a {{WorkerGlobalScope}} created by fetching a
+    script from `https://example.com/worker.js` will have its
+    [=WorkerGlobalScope/policy container=]'s
+    [=policy container/IP address space=] property set to
+    [=IP address space/public=].
+
+    Any fetch [=request=] initiated by this worker that [=obtains a connection=]
+    to an IP address in the [=IP address space/private=] or
+    [=IP address space/local=] [=address spaces=] would then be a
+    [=private network request=].
+  </div>
+
+ISSUE: Chromium’s implementation currently applies the LNA permission for
+service worker-initiated fetches based on the worker’s script origin (since
+there may not be an active document around when the service worker is
+executing). It may be better for this to be based on the partitioned storage
+key of the worker, and it would also be good if permissions policy supported
+service workers
+
+ISSUE: The [Service
+Worker](https://w3c.github.io/ServiceWorker/#dfn-service-worker) [soft
+update](https://w3c.github.io/ServiceWorker/#soft-update) algorithm
+unfortunately sets a [request
+client](https://fetch.spec.whatwg.org/#concept-request-client) of "null" when
+[fetching](https://fetch.spec.whatwg.org/#concept-fetch) an updated script.
+This causes all sorts of issues, and interferes with the local network access
+check algorithm laid out above. Indeed, there is no [request
+client](https://fetch.spec.whatwg.org/#concept-request-client) from which to
+copy the [policy
+container](https://fetch.spec.whatwg.org/#concept-request-policy-container)
+during [fetch](https://fetch.spec.whatwg.org/#concept-fetch). [\[Issue
+\#83\]](https://github.com/wicg/private-network-access/issues/83)
+
 
 
 # Implementation considerations # {#implementation-considerations}
@@ -600,7 +961,7 @@ http://bar.local/image.jpeg. This resource is not in the user agent’s cache, s
 goes through HTTP network fetch and triggers the permission prompt.
 </div>
 
-See <a href="#security-http-cache">HTTP Cache Security</a> for a discussion of
+See [[#security-http-cache]] for a discussion of
 security implications.
 
 ## Rollout Difficulties ## {#rollout-difficulties}
@@ -617,8 +978,8 @@ difficult, for a lower payoff. Indeed, exploiting such fetches requires
 attackers to already have a foothold in the private network, which
 substantially raises attack difficulty. As a result, Chromium is exempting
 these fetches from restrictions temporarily, choosing to focus on fetches from
-the public IP address space. See <a href="#local-network-attackers">Local
-Network Attackers</a> for a discussion of security implications.
+the public IP address space. See [[#local-network-attackers]] for a discussion
+of security implications.
 
 # Security and Privacy Considerations # {#security-and-privacy}
 
@@ -734,9 +1095,8 @@ whether a user has visited particular private websites in the past.
 Due to HTTP cache partitioning, a subresource can only be loaded from cache by
 malicious attackers who manage to replicate the [=network partition
 key=] of the cache entry. One way an attacker could
-achieve this is by manipulating DNS (see also <a href="#dns-rebinding">DNS
-Rebinding</a> in order to impersonate the top-level site that initially
-embedded the cached resource.
+achieve this is by manipulating DNS (see also [[#dns-rebinding]] in order to
+impersonate the top-level site that initially embedded the cached resource.
 
 The user agent navigates to http://router.example, which is served from
 192.168.1.1. The website embeds a logo from
