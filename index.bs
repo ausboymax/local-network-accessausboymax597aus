@@ -16,6 +16,19 @@ WPT Path Prefix: TODO-API-LABEL
 WPT Display: closed
 Include MDN Panels: if possible
 Include Can I Use Panels: yes
+Indent: 2
+</pre>
+
+<pre class="anchors">
+spec: FETCH; urlPrefix: https://fetch.spec.whatwg.org/
+  type: abstract-op
+    text: fetch; url: #concept-fetch
+spec: FETCH; urlPrefix: https://fetch.spec.whatwg.org/
+  type: abstract-op
+    text: HTTP-network fetch; url: #concept-http-network-fetch
+spec: FETCH; urlPrefix: https://fetch.spec.whatwg.org/
+  type: abstract-op
+    text: HTTP-network-or-cache fetch; url: #concept-http-network-or-cache-fetch
 </pre>
 
 <pre class="biblio">
@@ -506,10 +519,10 @@ IP address space is now set to local.
 
 Subresources loaded from the HTTP cache are subject to the Local Network Access
 check. This is not yet reflected in the algorithms above, since that check is
-only applied in HTTP-network fetch.
+only applied in [$HTTP-network fetch$].
 
 TODO: Specify and explain Chromium’s behavior here, or add an
-HTTP-network-or-cache fetch integration above. [\[Issue
+[$HTTP-network-or-cache fetch$] integration above. [\[Issue
 \#75\]](https://github.com/wicg/private-network-access/issues/75) We include a
 sketch below.
 
@@ -691,8 +704,7 @@ progress, despite the lingering risk from local network attackers.
 
 Cached subresources are protected by this specification, as the HTTP cache
 remembers the source IP address which can be used in the Local Network Access
-check algorithm during HTTP-network-or-cache
-fetch>
+check algorithm during [$HTTP-network-or-cache fetch$].
 
 Without this check, a malicious public website might be able to determine
 whether a user has visited particular private websites in the past.
