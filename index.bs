@@ -54,6 +54,28 @@ Include Can I Use Panels: yes
 
 }
 </pre>
+<style>
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    caption-side: bottom;
+  }
+  table caption {
+    padding: 5px;
+  }
+  th, td {
+    border-width: 1px;
+    border-style: solid;
+    padding: 5px 10px;
+  }
+  th {
+    background-color: lightblue;
+    border-color: black;
+  }
+  td {
+    border-color: grey;
+  }
+</style>
 
 # Introduction # {#intro}
 
