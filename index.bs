@@ -16,6 +16,19 @@ WPT Path Prefix: TODO-API-LABEL
 WPT Display: closed
 Include MDN Panels: if possible
 Include Can I Use Panels: yes
+Indent: 2
+</pre>
+
+<pre class="anchors">
+spec: FETCH; urlPrefix: https://fetch.spec.whatwg.org/
+  type: abstract-op
+    text: fetch; url: #concept-fetch
+spec: FETCH; urlPrefix: https://fetch.spec.whatwg.org/
+  type: abstract-op
+    text: HTTP-network fetch; url: #concept-http-network-fetch
+spec: FETCH; urlPrefix: https://fetch.spec.whatwg.org/
+  type: abstract-op
+    text: HTTP-network-or-cache fetch; url: #concept-http-network-or-cache-fetch
 </pre>
 
 <pre class="biblio">
@@ -132,6 +145,7 @@ of scope for this specification
 
 ### User granting permission ### {#example-user-granting-permission}
 
+<div class="example">
 Alice is at home on her laptop browsing the internet. She has a printer on her
 local network built by Acme Printing Company that is running a simple HTTP
 server. Alice is having a problem with the printer not properly functioning.
@@ -145,18 +159,22 @@ https://support.acmeprintingcompany.com to connect to local devices on her
 network, and https://support.acmeprintingcompany.com connects to her local
 printer's diagnostic output, and tells Alice that a part is malfunctioning on
 the printer and needs to be replaced.
+</div>
 
 ### User denying permission ### {#example-user-denying-permission}
 
+<div class="example">
 Alice continues browsing online to find the best price for the replacement part
 on her printer. While looking at a general tech support forum, she suddenly
 gets a permission request in her browser for https://printersupport.evil.com to
 connect to local devices on her local network. Being suspicious of why
 https://printersupport.evil.com would need to connect to local devices, she
 denies the permission request.
+</div>
 
 ### New device configuration ### {#example-new-device-configuration}
 
+<div class="example">
 Instead of replacing the part on the printer, Alice decides instead to buy a
 new printer from Beta Manufacturing. Upon plugging in the printer and
 connecting it to her local network, Alice follows the instructions and goes to
@@ -165,6 +183,7 @@ button that will help her set up the printer defaults. Hitting the button, she
 gets a permission prompt asking for permission for
 https://setup.betaprinters.com to connect to her local devices, which she
 accepts.
+</div>
 
 # Framework # {#framework}
 
@@ -369,7 +388,7 @@ checks, since any software running on the user’s device is already in the most
 privileged vantage point on the user’s network.
 
 NOTE: Some [=local network requests=] are more challenging to secure than others.
-See § 4.4 Rollout difficulties for more details.
+See <a href="#rollout-difficulties"> Rollout Difficulties</a> for more details.
 
 ## Local Network Request Permission Prompt ## {#permission-prompt}
 
@@ -395,7 +414,8 @@ ISSUE: To be able to apply LNA checks to all cross-origin [=IP address
 space/local=] requests (see Issue above), Chromium plans to exempt local
 servers that likely cannot currently get publicly trusted HTTPS certificates
 from this requirement (e.g., servers on `.local` and private IP literals). See
-Section 4.4 (Rollout Difficulties) below for more discussion, and also see
+<a href="#rollout-difficulties"> Rollout Difficulties</a> for more discussion,
+and also see
 [https://github.com/WICG/private-network-access/issues/96](https://github.com/WICG/private-network-access/issues/96).
 
 ## Mixed Content ## {#mixed-content-lna}
@@ -441,3 +461,313 @@ around, see
 [https://wicg.github.io/private-network-access/#csp](https://wicg.github.io/private-network-access/#csp).
 This directive would be obviated if we implemented
 [https://github.com/wicg/private-network-access/issues/39](https://github.com/wicg/private-network-access/issues/39).\]
+
+# Integrations # {#integrations}
+
+
+# Implementation considerations # {#implementation-considerations}
+
+## File URLs ## {#file-urls}
+
+It isn’t entirely clear how file URLs fit into the public/local scheme outlined
+above. It would be nice to prevent folks from harming themselves by opening a
+malicious HTML file locally, on the one hand, but on the other, code running
+locally is somewhat outside of any coherent threat model.
+
+For the moment, let’s err on the side of treating file URLs as local, as they
+seem to be just as much a part of the local system as anything else on a
+loopback address.
+
+ISSUE: Re-evaluate this after implementation experience.
+
+## Proxies ## {#proxies}
+
+In the current implementation of this specification in Chromium, proxies
+influence the address space of resources they proxy. Specifically, resources
+fetched via proxies are considered to have been fetched from the proxy’s IP
+address itself.
+
+If a [=Document=] served by foo.example on a public address is fetched by the
+user agent via a proxy on a local address, then the [=Document=]'s [=policy
+container=]'s [=IP address space=] is set to local.
+
+The [=Document=] will in turn be allowed to make requests to other local
+addresses accessible to the browser.
+
+This can allow a website to learn that it was proxied by observing that it is
+allowed to make requests to local addresses, which is a privacy information
+leak. While this requires correctly guessing the URL of a resource on the local
+network, a single correct guess is sufficient.
+
+This is expected to be relatively rare and not warrant more mitigations. After
+all, in the status quo all websites can make requests to all IP addresses with
+no restrictions whatsoever.
+
+It would be interesting to explore a mechanism by which proxies could tell the
+browser "please treat this resource as public/local anyway", thereby passing
+on some information about the IP address behind the proxy.
+
+## HTTP Cache ## {#http-cache}
+
+The current implementation of this specification in Chromium interacts with the
+HTTP cache in two noteworthy ways, depending on which kind of resource is
+loaded from cache.
+
+### Main resources ### {#http-cache-main-resources}
+
+A [=document=] constructed from a cached [=response=] remembers the IP address
+from which the [=response=] was initially loaded. The IP address space of the
+[=document=] is derived anew from the IP address.
+
+In the common case, this entails that the [=document=]'s [=policy container=]'s
+IP address space is restored unmodified. However in the event that the user
+agent’s configuration has changed, the derived IP address space might be
+different.
+
+<div class="example">
+The user agent navigates to http://foo.example/, loads the main resource from
+1.2.3.4, caches it, then sets the resulting [document]'s [policy container]'s
+IP address space to public.
+
+The user agent then restarts, and a new configuration is applied specifying
+that 1.2.3.4 should be classified as a local address instead.
+
+The user agent navigates to http://foo.example/ once more and loads the main
+resource from the HTTP cache. The resulting [document]'s [policy container]'s
+IP address space is now set to local.
+</div>
+
+### Subresources ### {#http-cache-subresources}
+
+Subresources loaded from the HTTP cache are subject to the Local Network Access
+check. This is not yet reflected in the algorithms above, since that check is
+only applied in [$HTTP-network fetch$].
+
+TODO: Specify and explain Chromium’s behavior here, or add an
+[$HTTP-network-or-cache fetch$] integration above. [\[Issue
+\#75\]](https://github.com/wicg/private-network-access/issues/75) We include a
+sketch below.
+
+As with main resources, a subresource constructed from a cached response
+remembers the IP address from which the response was initially loaded. The IP
+address space of the response is derived anew from the IP address.
+
+In the common case, this entails that the response’s IP address space is
+restored unmodified. However, in the event that the user agent’s configuration
+has changed, the derived IP address space might be different.
+
+When a subresource request is blocked by LNA checks (i.e., the permission was
+denied), there is no resource response cached. If the permission is later reset
+or granted, the subresource request will go to the network.
+
+<div class="example">
+Previously allowed subresource load
+
+The user agent navigates to https://foo.example, which is loaded from 1.2.3.4
+(which has an IP address space of `public`). The document triggers a
+subresource request for http://bar.local/image.jpg, which when a connection is
+created has an IP address of 10.0.1.1 (which has an IP address space of
+`local`). This triggers a permission prompt, granting the Local Network Access
+permission to https://foo.example, and then the subresource is loaded and added
+to the user agent’s cache.
+
+The user agent resets the permission for https://foo.example.
+
+The user agent navigates to [https://foo.example](https://foo.example) once
+more, which once again triggers a subresource request for
+[http://bar.local/image.jpeg](http://bar.local/image.jpeg). This resource is in
+the user agent’s cache, with a cached response IP address of 10.0.1.1. This
+again triggers a permission prompt, which if granted will finish loading the
+resource from the user agent’s cache.
+</div>
+
+<div class="example">
+Previously blocked subresource load
+
+The user agent navigates to https://foo.example, which is loaded from 1.2.3.4
+(which has an IP address space of `public`). The document triggers a
+subresource request for http://bar.local/image.jpg, which when a connection is
+created has an IP address of 10.0.1.1 (which has an IP address space of
+`local`). This triggers a permission prompt, denying the Local Network Access
+permission to https://foo.example. The subresource request is blocked and no
+resource is added to the user agent’s cache.
+
+The user agent resets the permission for https://foo.example.
+
+The user agent navigates to [https://foo.example](https://foo.example) once
+more, which once again triggers a subresource request for
+http://bar.local/image.jpeg. This resource is not in the user agent’s cache, so
+goes through HTTP network fetch and triggers the permission prompt.
+</div>
+
+See <a href="#security-http-cache">HTTP Cache Security</a> for a discussion of
+security implications.
+
+## Rollout Difficulties ## {#rollout-difficulties}
+
+Local Network Access essentially deprecates direct access to the local network
+in favor of more secure user-agent-mediated alternatives. Web deprecations are
+hard. Chromium previously encountered many stumbling blocks on the way to
+shipping parts of [[PRIVATE-NETWORK-ACCESS]] (the predecessor to this
+specification).
+
+In particular, shipping restrictions on fetches from [=non-secure contexts=] in
+the local IP address space to services on `localhost` have proven particularly
+difficult, for a lower payoff. Indeed, exploiting such fetches requires
+attackers to already have a foothold in the private network, which
+substantially raises attack difficulty. As a result, Chromium is exempting
+these fetches from restrictions temporarily, choosing to focus on fetches from
+the public IP address space. See <a href="#local-network-attackers">Local
+Network Attackers</a> for a discussion of security implications.
+
+# Security and Privacy Considerations # {#security-and-privacy}
+
+TODO: add a reference to https://localmess.github.io/
+
+## User Mediation ## {#user-mediation}
+
+The proposal in this document only ensures that the user consents to access
+from the public internet. This proposal does not allow for devices to
+explicitly approve for connections from the public internet.
+
+An alternative model where devices had to explicitly approve for connections
+from the public internet was attempted in [[PRIVATE-NETWORK-ACCESS]], but ran into
+rollout difficulties.
+
+TODO: link to some rollout difficulties of PNA
+
+## DNS rebinding ## {#dns-rebinding}
+
+The mitigation described here operates upon the IP address which the user agent
+actually connects to when loading a particular resource. This check MUST be
+performed for each new connection made, as DNS rebinding attacks may otherwise
+trick the user agent into revealing information it shouldn’t.
+
+DNS rebinding attacks also mean that local network access checks MUST apply to
+all `public` to `local` requests (that is, we cannot simplify the algorithm to
+be “any cross-origin request to a `local` endpoint”, as this would open a risk
+of a user navigation to a.example, then moving networks or having DNS change to
+make a.example point to a local address).
+
+## Scope of Mitigation ## {#scope-of-mitigation}
+
+The proposal in this document merely mitigates attacks against local web
+services, it cannot fully solve them. For example, a router’s web-based
+administration interface must be designed and implemented to defend against
+CSRF on its own, and should not rely on a UA that behaves as specified in this
+document. The mitigation this document specifies is necessary given the reality
+of local web service implementation quality today, but vendors should not
+consider themselves absolved of responsibility, even if all UAs implement this
+mitigation.
+
+## Cross-network confusion ## {#cross-network-confusion}
+
+Most local networks cannot communicate with each other, yet they are all
+treated by this specification as belonging to the local IP address space. Going
+further, local addresses have meaning only on the local network where they are
+used. The same IP address might refer to entirely different devices in two
+different networks. A user granting permission for a.example to make local
+network requests could then move to a different network, and then a.example
+would continue to be able to make local network requests.
+
+This opens the door to cross-network attacks:
+
+  * A user connects to two different local networks: a home Wi-Fi network and a
+    corporate VPN. Their smart fridge has been hacked. They open their smart
+    fridge’s web interface, which then performs CSRF attacks against corporate
+    websites accessible via the VPN.
+
+  * A user connects to a malicious internet cafe Wi-Fi, which requires users to
+    keep a captive portal page open. They close their laptop, go home, open up
+    their laptop again. The captive portal page (either still open or reloaded
+    from cache as the user agent restores its previous state) performs CSRF
+  * attacks against the user’s home devices.
+
+  * A user connects to a malicious internet cafe Wi-Fi, whose captive portal
+    website caches a malicious script from
+    http://router.example/popular-library.js (the cafe network administrator
+    operates a malicious DNS server) with a very long expiry. The user powers
+    their computer off, goes home, boots up their computer again and visits their
+    router’s administration interface at http://router.example, which embeds
+    /popular-library.js. The malicious script is loaded in the administration
+    interface’s first-party context.
+
+None of these attacks are novel - they are just examples of the limitations of
+this specification.
+
+ISSUE: Potential mitigations would require noticing network changes and
+clearing state specific to the previous network. Doing so in a fully general
+manner is likely to be impossible short of clearing all state. Maybe a
+practical compromise can be reached. [PNA Issue
+#28](https://github.com/wicg/private-network-access/issues/28)
+
+An alternative approach might be to scope the permission grant to an identifier
+that distinguishes different networks.
+
+## Local network attackers ## {#local-network-attackers}
+
+Until local network access checks are applied to all cross-origin requests to
+the `local` address space, it is possible for a malicious server on the local
+network to (1) attack other servers on the local network, and (2) attack
+services running on `localhost` on a user’s machine. (1) is already possible
+without needing to abuse the user’s browser, but (2) remains a concern. For
+example, a captive portal might be able to redirect the user to a malicious
+page that tries to probe and attack vulnerable `localhost` services running on
+the user’s machine. (See also [PNA Issue
+#39](https://github.com/wicg/private-network-access/issues/39).)
+
+We see public websites on the drive-by web as a more urgent security (and
+privacy) risk and see an incremental rollout of these protections as valuable
+progress, despite the lingering risk from local network attackers.
+
+## HTTP cache ## {#security-http-cache}
+
+### Applying checks to subresources ### {#security-http-cache-subresources}
+
+Cached subresources are protected by this specification, as the HTTP cache
+remembers the source IP address which can be used in the Local Network Access
+check algorithm during [$HTTP-network-or-cache fetch$].
+
+Without this check, a malicious public website might be able to determine
+whether a user has visited particular private websites in the past.
+
+Due to HTTP cache partitioning, a subresource can only be loaded from cache by
+malicious attackers who manage to replicate the [=network partition
+key=] of the cache entry. One way an attacker could
+achieve this is by manipulating DNS (see also <a href="#dns-rebinding">DNS
+Rebinding</a> in order to impersonate the top-level site that initially
+embedded the cached resource.
+
+The user agent navigates to http://router.example, which is served from
+192.168.1.1. The website embeds a logo from
+http://router.example/$BRAND-logo.png, which is cached.
+
+A malicious attacker then re-binds router.example to an attacker-controlled
+public IP address, and somehow tricks the user into visiting
+http://router.example again. The malicious website attempts to embed the logo,
+and monitors whether the load is successful. If so, the attacker has determined
+the brand of the user’s router.
+
+### HTTP cache poisoning ### {#cache-poisoning}
+
+While this specification aims to protect local network servers from receiving
+requests from public websites, DNS rebinding can be used to carry out a similar
+attack through cache poisoning of unauthenticated resources.
+
+Attackers masquerading as http://router.com can cache a malicious script at
+http://router.com/totally-legit.js. Later on, when the user navigates to
+http://router.com/, the page might request the poisoned script and execute
+attacker code in a [=IP address space/less public=] [=IP address space=].
+
+This attack is partially mitigated by cache partitioning, which makes it so
+that the attacker must navigate a top-level browsing context to
+http://router.com/ before caching resources, which lacks subtlety. It is also
+not specific to Local Network Access, rather being a symptom of plaintext
+HTTP’s lack of authentication and integrity protection.
+
+# Acknowledgements # {#acknowledgements}
+
+Many thanks for valuable feedback and advice from Titouan Rigoudy, Jonathan
+Hao, and Yifan Luo who worked on the original Private Network Access proposals
+and specification, and generously discussed their work and helped brainstorm
+paths forward.
