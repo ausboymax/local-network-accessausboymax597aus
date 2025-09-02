@@ -108,7 +108,7 @@ grants permission to the initiating website to make connections to their local
 network.
 
 Note: This proposal builds on top of Chrome's previously paused
-[[PRIVATE-NETWORK-ACCESS]] work but differs by gating access on a permission
+[[PRIVATE-NETWORK-ACCESS obsolete]] work but differs by gating access on a permission
 rather than via preflight requests.
 
 ## Goals ## {#goals}
@@ -132,8 +132,8 @@ There should be a well-lit path to allow these requests when the user is both
 expecting and explicitly allowing the local network access requests to occur.
 For example, a user logged in to [plex.tv](https://plex.tv) may want to allow
 the site to connect to their local media server to directly load media content
-over the local network instead of routing through remote servers. See S1.2
-below for more examples.
+over the local network instead of routing through remote servers. See
+[[#examples]] below for more examples.
 
 ## Non-goals ## {#non-goals}
 
@@ -145,7 +145,7 @@ of scope for this specification
 
 ### User granting permission ### {#example-user-granting-permission}
 
-<div class="example">
+<div class="example" id="example-printer-support">
 Alice is at home on her laptop browsing the internet. She has a printer on her
 local network built by Acme Printing Company that is running a simple HTTP
 server. Alice is having a problem with the printer not properly functioning.
@@ -163,7 +163,7 @@ the printer and needs to be replaced.
 
 ### User denying permission ### {#example-user-denying-permission}
 
-<div class="example">
+<div class="example" id="example-printer-evil">
 Alice continues browsing online to find the best price for the replacement part
 on her printer. While looking at a general tech support forum, she suddenly
 gets a permission request in her browser for https://printersupport.evil.com to
@@ -174,7 +174,7 @@ denies the permission request.
 
 ### New device configuration ### {#example-new-device-configuration}
 
-<div class="example">
+<div class="example" id="example-printer-setup">
 Instead of replacing the part on the printer, Alice decides instead to buy a
 new printer from Beta Manufacturing. Upon plugging in the printer and
 connecting it to her local network, Alice follows the instructions and goes to
@@ -187,7 +187,7 @@ accepts.
 
 ### App-based sign in ### {#example-app-based-sign-in}
 
-<div class="example">
+<div class="example" id="example-local-login">
 Alice uses their personal device for a limited set of tasks at work.
 Their employer doesn't require device management for these basic tasks,
 but they do require an authentication app to be installed, which provides
@@ -208,16 +208,19 @@ using her device unlock.
 Define {{IPAddressSpace}} as follows:
 
 <pre class=idl>
-enum IPAddressSpace { "public", "local" };
+enum IPAddressSpace { "public", "local", "loopback" };
 </pre>
 
 Every IP address belongs to an <dfn export local-lt="address space">IP address
-space</dfn>, which can be one of two different values:
+space</dfn>, which can be one of three different values:
+
+  1. <dfn for="IP address space" export>loopback</dfn>: Includes loopback addresses,
+    which are only accessible on the local host. In other words, addresses whose
+    target differs for every device.
 
   1. <dfn for="IP address space" export>local</dfn>: contains addresses that have
     meaning only within the current network. In other words, addresses whose target
-    differs based on network position. This includes loopback addresses, which are
-    only accessible on the local host (and thus differ for every device).
+    differs based on network position.
 
   1. <dfn for="IP address space" export>public</dfn>: contains all other
     addresses. In other words, addresses whose target is the same for all devices
@@ -225,6 +228,8 @@ space</dfn>, which can be one of two different values:
 
 For convenience, we additionally define the following terms:
 
+  1. A <dfn>loopback address</dfn> is an IP address whose [=/IP address space=]
+    is [=IP address space/loopback=].
   1. A <dfn>local address</dfn> is an IP address whose [=/IP address space=] is
     [=IP address space/local=].
   1. A <dfn>public address</dfn> is an IP address whose [=/IP address space=]
@@ -234,6 +239,8 @@ An [=/IP address space=] |lhs| is
 <dfn for="IP address space" export>less public</dfn> than an
 [=/IP address space=] |rhs| if any of the following conditions holds true:
 
+  1. |lhs| is [=IP address space/loopback=] and |rhs| is either
+    [=IP address space/local=] or [=IP address space/public=].
   1. |lhs| is [=IP address space/local=] and |rhs| is
     [=IP address space/public=].
 
@@ -243,7 +250,7 @@ To <dfn export>determine the IP address space</dfn> of an IP address
   1.  If |address| belongs to the `::ffff:0:0/96` "IPv4-mapped Address"
       address block, then replace |address| with its embedded IPv4 address.
   1.  For each |row| in the
-      <a href="#non-public-ip-address-blocks">Non-public IP address blocks"</a>
+      <a href="#non-public-ip-address-blocks">Non-public IP address blocks</a>
       table:
       1.   If |address| belongs to |row|'s address block, return |row|'s
            address space.
@@ -264,7 +271,7 @@ To <dfn export>determine the IP address space</dfn> of an IP address
         <td>`127.0.0.0/8`</td>
         <td>IPv4 Loopback</td>
         <td>[[RFC1122]]</td>
-        <td>[=IP address space/local=]</td>
+        <td>[=IP address space/loopback=]</td>
       </tr>
       <tr>
         <td>`10.0.0.0/8`</td>
@@ -294,19 +301,19 @@ To <dfn export>determine the IP address space</dfn> of an IP address
         <td>`198.18.0.0/15`</td>
         <td>Benchmarking</td>
         <td>[[RFC2544]]</td>
-        <td>[=IP address space/local=]</td>
+        <td>[=IP address space/loopback=]</td>
       </tr>
       <tr>
         <td>`169.254.0.0/16`</td>
         <td>Link Local</td>
         <td>[[RFC3927]]</td>
-        <td>[=IP address space/private=]</td>
+        <td>[=IP address space/local=]</td>
       </tr>
       <tr>
         <td>`::1/128`</td>
         <td>IPv6 Loopback</td>
         <td>[[RFC4291]]</td>
-        <td>[=IP address space/local=]</td>
+        <td>[=IP address space/loopback=]</td>
       </tr>
       <tr>
         <td>`fc00::/7`</td>
@@ -318,6 +325,42 @@ To <dfn export>determine the IP address space</dfn> of an IP address
         <td>`fe80::/10`</td>
         <td>Link-Local Unicast</td>
         <td>[[RFC4291]]</td>
+        <td>[=IP address space/local=]</td>
+      </tr>
+      <tr>
+        <td>`fec0::/10`</td>
+        <td>Site-Local Unicast</td>
+        <td>[[RFC3513 obsolete]]</td>
+        <td>[=IP address space/local=]</td>
+      </tr>
+      <tr>
+        <td>`0.0.0.0/32`</td>
+        <td>IPv4 null IP address</td>
+        <td>[[RFC1884 obsolete]]</td>
+        <td>[=IP address space/loopback=]</td>
+      </tr>
+      <tr>
+        <td>`0.0.0.0/8`</td>
+        <td>IPv4 null IP addresses</td>
+        <td>[[RFC1884 obsolete]]</td>
+        <td>[=IP address space/local=]</td>
+      </tr>
+      <tr>
+        <td>`::/128`</td>
+        <td>IPv6 unspecified address</td>
+        <td>[[RFC1884 obsolete]]</td>
+        <td>[=IP address space/loopback=]</td>
+      </tr>
+      <tr>
+        <td>`2001:db8::/32`</td>
+        <td>IPv6 documentation addresses</td>
+        <td>[[RFC3849]]</td>
+        <td>[=IP address space/local=]</td>
+      </tr>
+      <tr>
+        <td>`3fff::/20`</td>
+        <td>IPv6 documentation addresses</td>
+        <td>[[RFC9637]]</td>
         <td>[=IP address space/local=]</td>
       </tr>
       <tr>
@@ -338,7 +381,7 @@ user agents to treat the intranet as [=IP address space/local=].
 Note: Link-local IP addresses such as `169.254.0.0/16` are considered
 [=IP address space/local=], since such addresses can identify the same
 target for all devices on a network link. A previous version of this
-specification considered them to be [=IP address space/local=] instead.
+specification considered them to be [=IP address space/loopback=] instead.
 
 Note: The contents of each [=/IP address space=] were at one point determined
 in accordance with the IANA Special-Purpose Address Registries
@@ -347,11 +390,17 @@ defined therein. This turned out to be an inaccurate signal for our uses, as
 described in
 PNA's spec issue #50](https://github.com/WICG/private-network-access/issues/50).
 
-Note: [[PRIVATE-NETWORK-ACCESS]] used the address spaces public, private, and
-local. This specification simplifies the address spaces by combining
-[[PRIVATE-NETWORK-ACCESS]]'s private and local together into [=IP address
-space/local=].
+Note: [[PRIVATE-NETWORK-ACCESS obsolete]] used the address spaces public, private, and
+local. This specification renames the address spaces to public, local, and
+loopback, respectively.
 
+Note: [[FETCH]] plans to specify that requests to the null IP address will be
+treated as a network error. We map both the IPv4 null IP address space and the
+IPv6 unspecified address to [=IP address space/loopback=] as some systems can
+still route them back to the local host machine (and `0.0.0.0/8` can refer to
+"specified hosts on this network", so is mapped to [=IP address space/local=])
+per [[RFC5735 obsolete]]. Once the changes to Fetch have been made and adopted, we will
+no longer need to handle them in this specification.
 
 ## Local Network Request ## {#local-network-request-section}
 
@@ -381,6 +430,11 @@ Even so, this specification aims to offer a pragmatic solution to a security
 issue that broadly affects most users of the Web whose network configurations
 are not so complex.
 
+Requests originating from the [=loopback address=] should not be considered
+[=local network requests=], and should not be subject to local network access
+checks, since any software running on the user’s device is already in the most
+privileged vantage point on the user’s network.
+
 ISSUE: The definition of [=local network requests=] could be expanded to
 cover all cross-origin requests for which the [=request/current url=]'s
 {{URL/host}} maps to an IP address whose [=/IP address space=] is not
@@ -397,11 +451,6 @@ the cross-origin [=IP address space/local=] case than for the [=IP address
 space/public=] to [=IP address space/local=] case, and may want to scope these
 permission grants to the specific network or to the current browsing session
 only.
-
-NOTE: Requests originating from the loopback address should not be considered
-[=local network requests=], and should not be subject to local network access
-checks, since any software running on the user’s device is already in the most
-privileged vantage point on the user’s network.
 
 NOTE: Some [=local network requests=] are more challenging to secure than others.
 See [[#rollout-difficulties]] for more details.
@@ -427,7 +476,7 @@ The capability to make local network requests is a [=powerful feature=]
 and must only be allowed from [=secure contexts=].
 
 ISSUE: To be able to apply LNA checks to all cross-origin [=IP address
-space/local=] requests (see Issue above), Chromium plans to exempt local
+space/local=] requests in the future (see Issue above), Chromium plans to exempt local
 servers that likely cannot currently get publicly trusted HTTPS certificates
 from this requirement (e.g., servers on `.local` and private IP literals). See
 [[#rollout-difficulties]] for more discussion, and also see
@@ -472,10 +521,8 @@ If it does belong, then the permission can be checked to allow or fail the
 request.
 
 TODO: Decide if we want to keep the CSP directive `treat-as-public-address`
-around, see
-[https://wicg.github.io/private-network-access/#csp](https://wicg.github.io/private-network-access/#csp).
-This directive would be obviated if we implemented
-[https://github.com/wicg/private-network-access/issues/39](https://github.com/wicg/private-network-access/issues/39).\]
+around (see [private-network-access#csp](https://wicg.github.io/private-network-access/#csp)). This
+directive would be obviated if we implemented <wicg/private-network-access#39>.
 
 # Integrations # {#integrations}
 
@@ -488,29 +535,18 @@ normative references.
 
 ## Integration with Permissions ## {#integration-with-permissions}
 
-This document defines a [=powerful feature=] identified by the [=powerful
-feature/name=] <dfn export permission>`"local-network-access"`</dfn>.  It
-overrides the following type:
+This document defines a [=default powerful feature=] identified by the [=powerful
+feature/name=] <dfn export permission>`"local-network-access"`</dfn>.
 
-<dl>
-  <dt>[=powerful feature/permission descriptor type=]</dt>
-  <dd>
-    The [=powerful feature/permission descriptor type=] of the
-    <a permission>`"local-network-access"`</a> feature is defined by the
-    following WebIDL interface that [=dictionary/inherits=] from the
-    default [=powerful feature/permission descriptor type=]:
-    <pre class="idl">
-      dictionary LocalNetworkAccessPermissionDescriptor
-          : PermissionDescriptor {
-        DOMString id;
-      };
-    </pre>
-  </dd>
-</dl>
+## Integration with Permissions Policy ## {#integration-with-permissions-policy}
+
+Local Network Access defines a [=policy-controlled feature=] identified by the
+string "local-network-access". Its [=policy-controlled feature/default allowlist=]
+is `'self'`.
 
 ## Integration with Fetch ## {#integration-with-fetch}
 
-This document proposes a few changes to Fetch, with the following implication:
+This document proposes a few changes to [[FETCH]], with the following implication:
 [=local network requests=] are only allowed if their
 [=request/client=] is a [=secure context=]
 **and** permission is granted by the user. If the request would have been
@@ -571,7 +607,7 @@ What follows is a sketch of a potential solution:
 
           NOTE: If |request|'s [=request/policy container=] is null, then LNA
           checks do not apply to |request|. Users of the [=fetch=] algorithm
-          should take care to either set |request|'s [=request/client=] to an
+          have to take care to either set |request|'s [=request/client=] to an
           [=environment settings object=] with a non-null [=environment settings
           object/policy container=] and let [=fetch=] initialize |request|'s
           [=request/policy container=] accordingly, or to directly set
@@ -672,12 +708,12 @@ What follows is a sketch of a potential solution:
           NOTE: Because request’s target IP address space is set to a non-null
           value when recursing, this recursion can go at most 1 level deep.
 
-TODO: Figure out what we need to add for cache fetch. A sketch of Chromium’s
-behavior is included below in [[#http-cache]].
+<p class="todo">TODO: Figure out what we need to add for cache fetch. A sketch of Chromium’s
+behavior is included below in [[#http-cache]].</p>
 
 NOTE: The requirement that local network requests be made from secure contexts
 means that any insecure request will be blocked as mixed content unless we can
-know ahead of time that the request should be considered a local network
+know ahead of time that the request can be considered a local network
 request. By setting the target IP address space property (see Step 6i and 6ii
 above), we only need to make a small change to Mixed Content -- see
 [[#integration-with-mixed-content]].
@@ -739,10 +775,10 @@ upgrading in step 1:
 WebSockets connections should be subject to the same local network access
 permission requirements.
 
-[TODO: WebSockets “Obtain a WebSocket connection” is distinct, and a
+TODO: WebSockets “Obtain a WebSocket connection” is distinct, and a
 “WebSocket connection” is also distinct. So strictly by spec we need to
 duplicate some of our Fetch details but for WebSockets. See
-[https://websockets.spec.whatwg.org/\#concept-websocket-connection-obtain](https://websockets.spec.whatwg.org/#concept-websocket-connection-obtain)\]
+[https://websockets.spec.whatwg.org/\#concept-websocket-connection-obtain](https://websockets.spec.whatwg.org/#concept-websocket-connection-obtain).
 
 ## Integration with WebTransport ## {#integration-with-webtransport}
 
@@ -774,7 +810,7 @@ follows:
         to <var ignore>response</var>'s [=response/IP address space=].
 
 
-<div class="example">
+<div class="example" id="example-policy-container">
 Assuming that `example.com` resolves to a [=public address=] (say,
 `123.123.123.123`), then the {{Document}} created when navigating to
 `https://example.com/document.html` will have its
@@ -794,7 +830,7 @@ property set to [=IP address space/local=].
 </div>
 
 TODO: Also update the reference to Private Network Access in
-https://html.spec.whatwg.org/multipage/browsers.html#coep
+https://html.spec.whatwg.org/multipage/browsers.html#coep.
 
 ## Integration with Workers ## {#integration-with-workers}
 
@@ -805,7 +841,7 @@ Given that {{WorkerGlobalScope}} already has a
 policy container from a fetch response=] algorithm, the avove integrations
 with Fetch and HTML apply just as well to worker contexts as to documents.
 
-  <div class="example">
+  <div class="example" id="example-worker-policy">
     Assuming that `example.com` resolves to a [=public address=] (say,
     `123.123.123.123`), then a {{WorkerGlobalScope}} created by fetching a
     script from `https://example.com/worker.js` will have its
@@ -814,9 +850,9 @@ with Fetch and HTML apply just as well to worker contexts as to documents.
     [=IP address space/public=].
 
     Any fetch [=request=] initiated by this worker that [=obtains a connection=]
-    to an IP address in the [=IP address space/private=] or
-    [=IP address space/local=] [=address spaces=] would then be a
-    [=private network request=].
+    to an IP address in the [=IP address space/local=] or
+    [=IP address space/loopback=] [=address spaces=] would then be a
+    [=local network request=].
   </div>
 
 ISSUE: Chromium’s implementation currently applies the LNA permission for
@@ -824,7 +860,7 @@ service worker-initiated fetches based on the worker’s script origin (since
 there may not be an active document around when the service worker is
 executing). It may be better for this to be based on the partitioned storage
 key of the worker, and it would also be good if permissions policy supported
-service workers
+service workers.
 
 ISSUE: The [Service
 Worker](https://w3c.github.io/ServiceWorker/#dfn-service-worker) [soft
@@ -901,13 +937,13 @@ IP address space is restored unmodified. However in the event that the user
 agent’s configuration has changed, the derived IP address space might be
 different.
 
-<div class="example">
+<div class="example" id="example-resource-cache-policy">
 The user agent navigates to http://foo.example/, loads the main resource from
 1.2.3.4, caches it, then sets the resulting [document]'s [policy container]'s
 IP address space to public.
 
 The user agent then restarts, and a new configuration is applied specifying
-that 1.2.3.4 should be classified as a local address instead.
+that 1.2.3.4 <span class="allow-2119">should</span> be classified as a local address instead.
 
 The user agent navigates to http://foo.example/ once more and loads the main
 resource from the HTTP cache. The resulting [document]'s [policy container]'s
@@ -921,9 +957,8 @@ check. This is not yet reflected in the algorithms above, since that check is
 only applied in [$HTTP-network fetch$].
 
 TODO: Specify and explain Chromium’s behavior here, or add an
-[$HTTP-network-or-cache fetch$] integration above. [\[Issue
-\#75\]](https://github.com/wicg/private-network-access/issues/75) We include a
-sketch below.
+[$HTTP-network-or-cache fetch$] integration above. See <wicg/private-network-access#75>.
+We include a sketch below.
 
 As with main resources, a subresource constructed from a cached response
 remembers the IP address from which the response was initially loaded. The IP
@@ -937,7 +972,7 @@ When a subresource request is blocked by LNA checks (i.e., the permission was
 denied), there is no resource response cached. If the permission is later reset
 or granted, the subresource request will go to the network.
 
-<div class="example">
+<div class="example" id="example-subresource-previously-allowed">
 Previously allowed subresource load
 
 The user agent navigates to https://foo.example, which is loaded from 1.2.3.4
@@ -958,7 +993,7 @@ again triggers a permission prompt, which if granted will finish loading the
 resource from the user agent’s cache.
 </div>
 
-<div class="example">
+<div class="example" id="example-subresource-previously-blocked">
 Previously blocked subresource load
 
 The user agent navigates to https://foo.example, which is loaded from 1.2.3.4
@@ -977,15 +1012,14 @@ http://bar.local/image.jpeg. This resource is not in the user agent’s cache, s
 goes through HTTP network fetch and triggers the permission prompt.
 </div>
 
-See [[#security-http-cache]] for a discussion of
-security implications.
+See [[#security-http-cache]] for a discussion of security implications.
 
 ## Rollout Difficulties ## {#rollout-difficulties}
 
 Local Network Access essentially deprecates direct access to the local network
 in favor of more secure user-agent-mediated alternatives. Web deprecations are
 hard. Chromium previously encountered many stumbling blocks on the way to
-shipping parts of [[PRIVATE-NETWORK-ACCESS]] (the predecessor to this
+shipping parts of [[PRIVATE-NETWORK-ACCESS obsolete]] (the predecessor to this
 specification).
 
 In particular, shipping restrictions on fetches from [=non-secure contexts=] in
@@ -999,8 +1033,6 @@ of security implications.
 
 # Security and Privacy Considerations # {#security-and-privacy}
 
-TODO: add a reference to https://localmess.github.io/
-
 ## User Mediation ## {#user-mediation}
 
 The proposal in this document only ensures that the user consents to access
@@ -1008,10 +1040,13 @@ from the public internet. This proposal does not allow for devices to
 explicitly approve for connections from the public internet.
 
 An alternative model where devices had to explicitly approve for connections
-from the public internet was attempted in [[PRIVATE-NETWORK-ACCESS]], but ran into
-rollout difficulties.
+from the public internet was attempted in [[PRIVATE-NETWORK-ACCESS obsolete]], but ran into
+[rollout difficulties](https://developer.chrome.com/blog/pna-on-hold).
 
-TODO: link to some rollout difficulties of PNA
+Requiring user mediation, regardless of whether the target endpoint opts in to
+the connection, also helps mitigate privacy issues such as the
+["Local Mess"](https://localmess.github.io) tracking method where the local
+endpoint and the remote website are colluding to link user identities.
 
 ## DNS rebinding ## {#dns-rebinding}
 
