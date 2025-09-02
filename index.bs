@@ -26,9 +26,10 @@ spec: FETCH; urlPrefix: https://fetch.spec.whatwg.org/
 spec: FETCH; urlPrefix: https://fetch.spec.whatwg.org/
   type: abstract-op
     text: HTTP-network fetch; url: #concept-http-network-fetch
-spec: FETCH; urlPrefix: https://fetch.spec.whatwg.org/
-  type: abstract-op
+spec: FETCH; urlPrefix: https://fetch.spec.whatwg.org/;
+  type: abstract-op;
     text: HTTP-network-or-cache fetch; url: #concept-http-network-or-cache-fetch
+url: https://websockets.spec.whatwg.org/#concept-websocket-connection-obtain; type: dfn; text: obtain a Websocket connection
 </pre>
 
 <pre class="biblio">
@@ -63,8 +64,11 @@ spec: FETCH; urlPrefix: https://fetch.spec.whatwg.org/
   "IPV6-REGISTRY": {
     "href": "https://www.iana.org/assignments/iana-ipv6-special-registry/iana-ipv6-special-registry.xhtml",
     "title": "IANA IPv6 Special-Purpose Address Registry"
+  },
+  "LET-LOCALHOST-BE-LOCALHOST": {
+    "href": "https://datatracker.ietf.org/doc/html/draft-ietf-dnsop-let-localhost-be-localhost",
+    "title": "Let 'localhost' be localhost."
   }
-
 }
 </pre>
 <style>
@@ -387,8 +391,7 @@ Note: The contents of each [=/IP address space=] were at one point determined
 in accordance with the IANA Special-Purpose Address Registries
 ([[IPV4-REGISTRY]] and [[IPV6-REGISTRY]]) and the `Globally Reachable` bit
 defined therein. This turned out to be an inaccurate signal for our uses, as
-described in
-PNA's spec issue #50](https://github.com/WICG/private-network-access/issues/50).
+described in <WICG/private-network-access#50>.
 
 Note: [[PRIVATE-NETWORK-ACCESS obsolete]] used the address spaces public, private, and
 local. This specification renames the address spaces to public, local, and
@@ -435,22 +438,21 @@ Requests originating from the [=loopback address=] should not be considered
 checks, since any software running on the user’s device is already in the most
 privileged vantage point on the user’s network.
 
-ISSUE: The definition of [=local network requests=] could be expanded to
-cover all cross-origin requests for which the [=request/current url=]'s
-{{URL/host}} maps to an IP address whose [=/IP address space=] is not
-[=IP address space/public=]. This would prevent a malicious server on the
-local network from attacking other servers, including servers on `localhost`.
-Currently, Chromium only implements Local Network Access restrictions for
-[=IP address space/public=] to [=IP address space/local=] requests, and does
-not enforce the permission for cross-origin [=IP address space/local=]
-requests. This can be shipped as an incremental improvement later on. [PNA
-Issue #39](https://github.com/wicg/private-network-access/issues/39) We note
-that, because local names and addresses are not meaningful outside the bounds
-of the network, implementers may want to use a different permission prompt for
-the cross-origin [=IP address space/local=] case than for the [=IP address
-space/public=] to [=IP address space/local=] case, and may want to scope these
-permission grants to the specific network or to the current browsing session
-only.
+ISSUE: The definition of [=local network requests=] could be expanded to cover
+all cross-origin requests for which the [=request/current url=]'s {{URL/host}}
+maps to an IP address whose [=/IP address space=] is not [=IP address
+space/public=]. This would prevent a malicious server on the local network from
+attacking other servers, including servers on `localhost`. Currently, Chromium
+only implements Local Network Access restrictions for [=IP address
+space/public=] to [=IP address space/local=] or [=IP address space/loopback=]
+requests, and does not enforce the permission for cross-origin [=IP address
+space/local=] requests. This can be shipped as an incremental improvement later
+on. See <WICG/private-network-access#39>. We note that, because local names and
+addresses are not meaningful outside the bounds of the network, implementers
+may want to use a different permission prompt for the cross-origin [=IP address
+space/local=] case than for the [=IP address space/public=] to [=IP address
+space/local=] case, and may want to scope these permission grants to the
+specific network or to the current browsing session only.
 
 NOTE: Some [=local network requests=] are more challenging to secure than others.
 See [[#rollout-difficulties]] for more details.
@@ -476,11 +478,11 @@ The capability to make local network requests is a [=powerful feature=]
 and must only be allowed from [=secure contexts=].
 
 ISSUE: To be able to apply LNA checks to all cross-origin [=IP address
-space/local=] requests in the future (see Issue above), Chromium plans to exempt local
-servers that likely cannot currently get publicly trusted HTTPS certificates
-from this requirement (e.g., servers on `.local` and private IP literals). See
-[[#rollout-difficulties]] for more discussion, and also see
-[https://github.com/WICG/private-network-access/issues/96](https://github.com/WICG/private-network-access/issues/96).
+space/local=] requests in the future (see Issue above), Chromium plans to
+exempt local servers that likely cannot currently get publicly trusted HTTPS
+certificates from this requirement (e.g., servers on `.local` and private IP
+literals). See [[#rollout-difficulties]] for more discussion, and also see
+<WICG/private-network-access#96>.
 
 ## Mixed Content ## {#mixed-content-lna}
 
@@ -521,8 +523,10 @@ If it does belong, then the permission can be checked to allow or fail the
 request.
 
 TODO: Decide if we want to keep the CSP directive `treat-as-public-address`
-around (see [private-network-access#csp](https://wicg.github.io/private-network-access/#csp)). This
-directive would be obviated if we implemented <wicg/private-network-access#39>.
+around (see
+[private-network-access#csp](https://wicg.github.io/private-network-access/#csp)).
+This directive would be obviated if we implemented
+<WICG/private-network-access#39>.ß
 
 # Integrations # {#integrations}
 
@@ -551,7 +555,7 @@ This document proposes a few changes to [[FETCH]], with the following implicatio
 [=request/client=] is a [=secure context=]
 **and** permission is granted by the user. If the request would have been
 blocked as mixed content, it can be allowed as long as the website states its
-intention to access the private network, and users give permission.
+intention to access the local network, and users give permission.
 
 Note: This includes navigations. These can indeed be used to trigger CSRF
 attacks, albeit with less subtlety than with subresource requests.
@@ -630,10 +634,10 @@ What follows is a sketch of a potential solution:
 
               1.  Let |error| be a [=network error=].
 
-              1.  If |request|'s [=request/client=] is not a [=secure context=]
+              2.  If |request|'s [=request/client=] is not a [=secure context=]
                   (including if it is null), then return |error|.
 
-              1.  Set |error|'s [=response/IP address space=] property to
+              3.  Set |error|'s [=response/IP address space=] property to
                   |connection|'s [=connection/IP address space=].
 
               4.  TODO: Permission check is sketched out below, wording is still vague
@@ -660,13 +664,13 @@ What follows is a sketch of a potential solution:
 
              NOTE: We could also set the target IP address space to `local` if
              the request’s URL’s host is “localhost” or “127.0.0.1” (because of
-             \[let-localhost-be-localhost\]), but we do not need special
+             [[LET-LOCALHOST-BE-LOCALHOST]]), but we do not need special
              handling for the loopback case as it is already considered to be
              potentially trustworthy and won’t trigger mixed content checks.
 
              NOTE: We also explicitly do *not* set the target address space
              property in the public case, because that breaks the next step
-             here... (but maybe we could just skip that??)
+             here... (but maybe we could just skip that?)
 
              NOTE: We don’t set the target IP address space here if it was
              already non-null in order to prefer the explicit
@@ -775,10 +779,9 @@ upgrading in step 1:
 WebSockets connections should be subject to the same local network access
 permission requirements.
 
-TODO: WebSockets “Obtain a WebSocket connection” is distinct, and a
-“WebSocket connection” is also distinct. So strictly by spec we need to
-duplicate some of our Fetch details but for WebSockets. See
-[https://websockets.spec.whatwg.org/\#concept-websocket-connection-obtain](https://websockets.spec.whatwg.org/#concept-websocket-connection-obtain).
+TODO: WebSockets <a>obtain a WebSocket connection</a> is distinct, and a “WebSocket
+connection” is also distinct. So strictly by spec we need to duplicate some of
+our Fetch details but for WebSockets.
 
 ## Integration with WebTransport ## {#integration-with-webtransport}
 
@@ -787,11 +790,9 @@ permission requirements.
 
 ## Integration with HTML ## {#integration-with-html}
 
-To support the checks in [[FETCH]], user
-agents must remember the source IP address space of contexts in which network
-requests are made. To this effect, the
-[[HTML]] specification is patched as
-follows:
+To support the checks in [[FETCH]], user agents must remember the source IP
+address space of contexts in which network requests are made. To this effect,
+the [[HTML]] specification is patched as follows:
 
   1. A new <dfn export for="policy container">IP address space </dfn> property
      is added to the [=/policy container=] [=struct=].
@@ -829,8 +830,7 @@ If, on the other hand, `example.com` resolved to a [=local address=]
 property set to [=IP address space/local=].
 </div>
 
-TODO: Also update the reference to Private Network Access in
-https://html.spec.whatwg.org/multipage/browsers.html#coep.
+TODO: Also update the reference to Private Network Access in [[html#coep]].
 
 ## Integration with Workers ## {#integration-with-workers}
 
@@ -873,8 +873,8 @@ check algorithm laid out above. Indeed, there is no [request
 client](https://fetch.spec.whatwg.org/#concept-request-client) from which to
 copy the [policy
 container](https://fetch.spec.whatwg.org/#concept-request-policy-container)
-during [fetch](https://fetch.spec.whatwg.org/#concept-fetch). [\[Issue
-\#83\]](https://github.com/wicg/private-network-access/issues/83)
+during [fetch](https://fetch.spec.whatwg.org/#concept-fetch). See
+<WICG/private-network-access#83>.
 
 
 
@@ -939,14 +939,14 @@ different.
 
 <div class="example" id="example-resource-cache-policy">
 The user agent navigates to http://foo.example/, loads the main resource from
-1.2.3.4, caches it, then sets the resulting [document]'s [policy container]'s
+1.2.3.4, caches it, then sets the resulting [=document=]'s [=policy container=]'s
 IP address space to public.
 
 The user agent then restarts, and a new configuration is applied specifying
 that 1.2.3.4 <span class="allow-2119">should</span> be classified as a local address instead.
 
 The user agent navigates to http://foo.example/ once more and loads the main
-resource from the HTTP cache. The resulting [document]'s [policy container]'s
+resource from the HTTP cache. The resulting [=document=]'s [=policy container=]'s
 IP address space is now set to local.
 </div>
 
@@ -957,8 +957,8 @@ check. This is not yet reflected in the algorithms above, since that check is
 only applied in [$HTTP-network fetch$].
 
 TODO: Specify and explain Chromium’s behavior here, or add an
-[$HTTP-network-or-cache fetch$] integration above. See <wicg/private-network-access#75>.
-We include a sketch below.
+[$HTTP-network-or-cache fetch$] integration above. See
+<WICG/private-network-access#75>. We include a sketch below.
 
 As with main resources, a subresource constructed from a cached response
 remembers the IP address from which the response was initially loaded. The IP
@@ -985,9 +985,9 @@ to the user agent’s cache.
 
 The user agent resets the permission for https://foo.example.
 
-The user agent navigates to [https://foo.example](https://foo.example) once
+The user agent navigates to https://foo.example once
 more, which once again triggers a subresource request for
-[http://bar.local/image.jpeg](http://bar.local/image.jpeg). This resource is in
+http://bar.local/image.jpeg. This resource is in
 the user agent’s cache, with a cached response IP address of 10.0.1.1. This
 again triggers a permission prompt, which if granted will finish loading the
 resource from the user agent’s cache.
@@ -1006,7 +1006,7 @@ resource is added to the user agent’s cache.
 
 The user agent resets the permission for https://foo.example.
 
-The user agent navigates to [https://foo.example](https://foo.example) once
+The user agent navigates to https://foo.example once
 more, which once again triggers a subresource request for
 http://bar.local/image.jpeg. This resource is not in the user agent’s cache, so
 goes through HTTP network fetch and triggers the permission prompt.
@@ -1110,8 +1110,7 @@ this specification.
 ISSUE: Potential mitigations would require noticing network changes and
 clearing state specific to the previous network. Doing so in a fully general
 manner is likely to be impossible short of clearing all state. Maybe a
-practical compromise can be reached. [PNA Issue
-#28](https://github.com/wicg/private-network-access/issues/28)
+practical compromise can be reached. See <WICG/private-network-access#28>.
 
 An alternative approach might be to scope the permission grant to an identifier
 that distinguishes different networks.
@@ -1125,8 +1124,7 @@ services running on `localhost` on a user’s machine. (1) is already possible
 without needing to abuse the user’s browser, but (2) remains a concern. For
 example, a captive portal might be able to redirect the user to a malicious
 page that tries to probe and attack vulnerable `localhost` services running on
-the user’s machine. (See also [PNA Issue
-#39](https://github.com/wicg/private-network-access/issues/39).)
+the user’s machine. (See also <WICG/private-network-accesss#39>.)
 
 We see public websites on the drive-by web as a more urgent security (and
 privacy) risk and see an incremental rollout of these protections as valuable
