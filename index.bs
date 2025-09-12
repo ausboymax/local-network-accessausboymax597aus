@@ -25,11 +25,17 @@ spec: FETCH; urlPrefix: https://fetch.spec.whatwg.org/
     text: fetch; url: #concept-fetch
 spec: FETCH; urlPrefix: https://fetch.spec.whatwg.org/
   type: abstract-op
+    text: fetch; url: #concept-fetch
+spec: FETCH; urlPrefix: https://fetch.spec.whatwg.org/
+  type: abstract-op
     text: HTTP-network fetch; url: #concept-http-network-fetch
 spec: FETCH; urlPrefix: https://fetch.spec.whatwg.org/;
   type: abstract-op;
     text: HTTP-network-or-cache fetch; url: #concept-http-network-or-cache-fetch
 url: https://websockets.spec.whatwg.org/#concept-websocket-connection-obtain; type: dfn; text: obtain a Websocket connection
+spec: WEBSOCKET; urlPrefix: https://websockets.spec.whatwg.org/
+  type: abstract-op;
+    text: WebSocket opening handshake; url: #websocket-opening-handshake
 </pre>
 
 <pre class="biblio">
@@ -777,11 +783,14 @@ upgrading in step 1:
 ## Integration with WebSockets ## {#integration-with-websockets}
 
 WebSockets connections should be subject to the same local network access
-permission requirements.
+permission requirements.  [$WebSocket opening handshake$] directly applies
+[$fetch$] in step 11, and so no modification to the WebSocket specification is
+required beyond the fetch change proposed above.
 
-TODO: WebSockets <a>obtain a WebSocket connection</a> is distinct, and a “WebSocket
-connection” is also distinct. So strictly by spec we need to duplicate some of
-our Fetch details but for WebSockets.
+One minor difference between the Fetch API and the WebSockets API is that
+WebSockets does not have an equivalent to fetch's `RequestInit`, and so there
+is no place to put in a `targetAddressSpace` option to bypass mixed content
+checks for ws:// urls. 
 
 ## Integration with WebTransport ## {#integration-with-webtransport}
 
